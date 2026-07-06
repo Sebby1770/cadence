@@ -56,7 +56,7 @@ export const LOCATIONS: Location[] = [
     region: 'Downtown',
     map: { x: 44, y: 40 },
     color: '245 68% 60%',
-    headcountTarget: 14,
+    headcountTarget: 4,
   },
   {
     id: 'l-marina',
@@ -66,7 +66,7 @@ export const LOCATIONS: Location[] = [
     region: 'Marina',
     map: { x: 26, y: 20 },
     color: '190 85% 45%',
-    headcountTarget: 8,
+    headcountTarget: 3,
   },
   {
     id: 'l-airport',
@@ -76,7 +76,7 @@ export const LOCATIONS: Location[] = [
     region: 'Airport',
     map: { x: 72, y: 74 },
     color: '22 90% 56%',
-    headcountTarget: 6,
+    headcountTarget: 2,
   },
   {
     id: 'l-bayview',
@@ -86,7 +86,7 @@ export const LOCATIONS: Location[] = [
     region: 'Bayview',
     map: { x: 80, y: 52 },
     color: '152 55% 45%',
-    headcountTarget: 10,
+    headcountTarget: 3,
   },
   {
     id: 'l-uptown',
@@ -96,7 +96,7 @@ export const LOCATIONS: Location[] = [
     region: 'Uptown',
     map: { x: 30, y: 58 },
     color: '280 65% 62%',
-    headcountTarget: 9,
+    headcountTarget: 3,
   },
 ]
 
@@ -252,63 +252,101 @@ function isoDate(d: Date) {
 const shifts: Shift[] = []
 let shiftSeq = 0
 
+interface Assn { date: string; start: number; end: number }
+const empAssign = new Map<string, Assn[]>()
+const empWeek = new Map<string, number>()
+const MAX_WEEK_SHIFTS = 6
+const deptByKey = Object.fromEntries(DEPARTMENTS.map((d) => [d.key, d]))
+
+// Which departments each location actually runs, and how many shifts a day.
+// (floor listed twice where it's the busiest team, to weight the pick.)
+const LOC_PROFILE: Record<string, { depts: string[]; base: number }> = {
+  'l-flagship': { depts: ['floor', 'floor', 'kitchen', 'bar', 'sales', 'support'], base: 4 },
+  'l-marina': { depts: ['floor', 'floor', 'kitchen', 'support'], base: 3 },
+  'l-airport': { depts: ['floor', 'sales'], base: 2 },
+  'l-bayview': { depts: ['support', 'sales', 'floor'], base: 3 },
+  'l-uptown': { depts: ['floor', 'floor', 'bar', 'sales', 'support'], base: 3 },
+}
+
+const overlaps = (list: Assn[] | undefined, date: string, start: number, end: number) =>
+  !!list?.some((a) => a.date === date && start < a.end && end > a.start)
+
 for (let day = 0; day < RANGE_DAYS; day++) {
   const date = addDays(RANGE_START, day)
   const dateStr = isoDate(date)
   const dow = date.getDay()
   const weekend = dow === 0 || dow === 6
+  const weekStart = isoDate(startOfWeek(date, { weekStartsOn: 1 }))
+  const future = day >= 3
 
   for (const loc of LOCATIONS) {
-    const load = weekend ? 1.25 : 1
-    for (const dept of DEPARTMENTS) {
-      if (dept.key === 'management') continue
+    const profile = LOC_PROFILE[loc.id]
+    const count = profile.base + (weekend ? 1 : 0)
+
+    for (let n = 0; n < count; n++) {
+      shiftSeq++
+      const sid = `s${shiftSeq}`
+      const r = (k: string) => seededRandom(`${sid}-${k}-${dateStr}-${loc.id}`)
+      const deptKey = profile.depts[Math.floor(r('dept') * profile.depts.length)]
+      const dept = deptByKey[deptKey]
       const depPositions = positionsByDept(dept.id)
       const depEmployees = employeesByDept(dept.id)
-      if (depPositions.length === 0) continue
+      if (!depPositions.length || !depEmployees.length) continue
 
-      const baseCount = dept.key === 'floor' ? 3 : dept.key === 'kitchen' ? 2 : 1
-      const count = Math.max(1, Math.round(baseCount * load))
+      const tplKey = TEMPLATE_KEYS[Math.floor(r('tpl') * (dept.key === 'bar' ? TEMPLATE_KEYS.length : 4))]
+      const tpl = TEMPLATES[tplKey]
+      const pos = depPositions[Math.floor(r('pos') * depPositions.length)]
 
-      for (let n = 0; n < count; n++) {
-        shiftSeq++
-        const sid = `s${shiftSeq}`
-        const r = (k: string) => seededRandom(`${sid}-${k}-${dateStr}-${loc.id}`)
-        const tplKey = TEMPLATE_KEYS[Math.floor(r('tpl') * (dept.key === 'bar' ? TEMPLATE_KEYS.length : 4))]
-        const tpl = TEMPLATES[tplKey]
-        const pos = depPositions[Math.floor(r('pos') * depPositions.length)]
+      // Keep ~20% of upcoming shifts open for the marketplace.
+      const openChance = future ? 0.2 : 0
+      const forceOpen = r('open') < openChance
 
-        // Decide assignment: keep ~18% of upcoming shifts open for the marketplace.
-        const future = day >= 3
-        const openChance = future ? 0.2 : 0
-        const isOpen = r('open') < openChance
-        let employeeId: string | null = null
-        if (!isOpen && depEmployees.length) {
-          const cand = depEmployees[Math.floor(r('emp') * depEmployees.length)]
-          employeeId = cand.id
+      // Assign to a qualified teammate who isn't double-booked and is under their weekly cap.
+      let employeeId: string | null = null
+      if (!forceOpen) {
+        let pool = depEmployees.filter(
+          (e) =>
+            (empWeek.get(`${e.id}|${weekStart}`) ?? 0) < MAX_WEEK_SHIFTS &&
+            !overlaps(empAssign.get(e.id), dateStr, tpl.start, tpl.end),
+        )
+        // On past days, keep stores staffed even if it means bending the weekly cap.
+        if (!pool.length && !future) {
+          pool = depEmployees.filter((e) => !overlaps(empAssign.get(e.id), dateStr, tpl.start, tpl.end))
         }
-
-        const distanceMi = Math.round((1 + r('dist') * 12) * 10) / 10
-        shifts.push({
-          id: sid,
-          date: dateStr,
-          start: tpl.start,
-          end: tpl.end,
-          employeeId,
-          positionId: pos.id,
-          departmentId: dept.id,
-          locationId: loc.id,
-          status: isOpen ? 'open' : day < 3 ? 'confirmed' : 'published',
-          requiredSkills: pick(SKILLS, `${sid}-rs`, 1 + Math.floor(r('nrs') * 2)),
-          distanceMi,
-          breakMin: tpl.end - tpl.start > 300 ? 30 : 0,
-          note: r('note') < 0.12 ? 'Expecting a delivery mid-shift.' : undefined,
-        })
+        if (pool.length) {
+          const chosen = [...pool].sort((a, b) => seededRandom(`${sid}-pk-${a.id}`) - seededRandom(`${sid}-pk-${b.id}`))[0]
+          employeeId = chosen.id
+          const arr = empAssign.get(chosen.id) ?? []
+          arr.push({ date: dateStr, start: tpl.start, end: tpl.end })
+          empAssign.set(chosen.id, arr)
+          empWeek.set(`${chosen.id}|${weekStart}`, (empWeek.get(`${chosen.id}|${weekStart}`) ?? 0) + 1)
+        }
       }
+
+      // Never leave a past-dated shift open — the marketplace should only show real openings.
+      if (!employeeId && !future) continue
+
+      const distanceMi = Math.round((1 + r('dist') * 12) * 10) / 10
+      shifts.push({
+        id: sid,
+        date: dateStr,
+        start: tpl.start,
+        end: tpl.end,
+        employeeId,
+        positionId: pos.id,
+        departmentId: dept.id,
+        locationId: loc.id,
+        status: employeeId ? (day < 3 ? 'confirmed' : 'published') : 'open',
+        requiredSkills: pick(SKILLS, `${sid}-rs`, 1 + Math.floor(r('nrs') * 2)),
+        distanceMi,
+        breakMin: tpl.end - tpl.start > 300 ? 30 : 0,
+        note: r('note') < 0.12 ? 'Expecting a delivery mid-shift.' : undefined,
+      })
     }
   }
 
-  // A couple of management/lead shifts at the flagship so the current user has a roster.
-  if (dow !== 0) {
+  // Lead shifts at the flagship (Mon/Wed/Fri/Sat) so the current user has a realistic roster.
+  if ([1, 3, 5, 6].includes(dow)) {
     shiftSeq++
     const leadTpl = dow % 2 === 0 ? TEMPLATES.open : TEMPLATES.close
     shifts.push({
