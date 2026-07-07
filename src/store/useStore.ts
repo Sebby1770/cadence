@@ -61,6 +61,8 @@ interface StoreState {
 
   pickUpShift: (shiftId: string) => void
   releaseShift: (shiftId: string) => void
+  moveShift: (shiftId: string, newDate: string) => void
+  assignShift: (shiftId: string, employeeId: string | null) => void
   offerShift: (shiftId: string, kind: SwapRequest['kind'], toEmployeeId?: string | null, message?: string) => void
   respondToSwap: (swapId: string, accept: boolean) => void
   approveSwap: (swapId: string) => void
@@ -143,6 +145,23 @@ export const useStore = create<StoreState>()(
         set((s) => ({
           shifts: s.shifts.map((sh) =>
             sh.id === shiftId ? { ...sh, employeeId: null, status: 'open' as const } : sh,
+          ),
+        })),
+
+      moveShift: (shiftId, newDate) =>
+        set((s) => {
+          const shift = s.shifts.find((sh) => sh.id === shiftId)
+          if (!shift || shift.date === newDate) return {}
+          get().addToast({ title: 'Shift rescheduled', description: 'Remember to re-publish the roster.', kind: 'success' })
+          return { shifts: s.shifts.map((sh) => (sh.id === shiftId ? { ...sh, date: newDate, status: 'draft' as const } : sh)) }
+        }),
+
+      assignShift: (shiftId, employeeId) =>
+        set((s) => ({
+          shifts: s.shifts.map((sh) =>
+            sh.id === shiftId
+              ? { ...sh, employeeId, status: employeeId ? ('draft' as const) : ('open' as const) }
+              : sh,
           ),
         })),
 

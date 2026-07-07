@@ -39,6 +39,7 @@ import {
 } from '@/data/selectors'
 import { iso } from '@/lib/dates'
 import { Avatar, Button, Card, Progress, Ring } from '@/components/ui'
+import { CountUp, GradientText, Magnetic, SpotlightCard } from '@/components/fx'
 import { ShiftListItem } from '@/components/shared/ShiftBits'
 
 const spring = { type: 'spring' as const, stiffness: 260, damping: 26 }
@@ -65,7 +66,7 @@ export default function Dashboard() {
   const nowMin = now.getHours() * 60 + now.getMinutes()
   const nextInProgress = !!next && next.date === iso(now) && nowMin >= next.start && nowMin < next.end
   const upcoming = upcomingShifts(shifts, me.id, now, 4)
-  const open = openShifts(shifts)
+  const open = openShifts(shifts).filter((s) => s.date >= iso(now))
   const working = workingNow(shifts, now)
   const pendingCount = pendingSwaps.length + pendingLeaves.length
 
@@ -100,7 +101,7 @@ export default function Dashboard() {
               {now.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
             </p>
             <h1 className="mt-1 text-3xl font-bold tracking-tight sm:text-4xl">
-              {greeting(now.getHours())}, <span className="text-gradient">{me.firstName}</span>
+              {greeting(now.getHours())}, <GradientText>{me.firstName}</GradientText>
             </h1>
             <p className="mt-2 max-w-md text-sm text-muted-foreground">
               {next
@@ -141,20 +142,21 @@ export default function Dashboard() {
       {/* Quick actions */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {quickActions.map((a, i) => (
-          <motion.button
-            key={a.label}
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ ...spring, delay: 0.04 * i }}
-            onClick={() => navigate(a.to)}
-            className="group flex items-center gap-3 rounded-2xl border border-border bg-card p-4 text-left shadow-card transition-all hover:-translate-y-0.5 hover:shadow-elevated"
-          >
-            <span className={cn('flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br text-white shadow-soft', a.tint)}>
-              <a.icon className="h-5 w-5" />
-            </span>
-            <span className="text-sm font-semibold leading-tight">{a.label}</span>
-            <ArrowRight className="ml-auto h-4 w-4 text-muted-foreground opacity-0 transition-all group-hover:translate-x-0.5 group-hover:opacity-100" />
-          </motion.button>
+          <Magnetic key={a.label} strength={0.22}>
+            <motion.button
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ ...spring, delay: 0.04 * i }}
+              onClick={() => navigate(a.to)}
+              className="group flex w-full items-center gap-3 rounded-2xl border border-border bg-card p-4 text-left shadow-card transition-all hover:-translate-y-0.5 hover:shadow-elevated"
+            >
+              <span className={cn('flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br text-white shadow-soft', a.tint)}>
+                <a.icon className="h-5 w-5" />
+              </span>
+              <span className="text-sm font-semibold leading-tight">{a.label}</span>
+              <ArrowRight className="ml-auto h-4 w-4 text-muted-foreground opacity-0 transition-all group-hover:translate-x-0.5 group-hover:opacity-100" />
+            </motion.button>
+          </Magnetic>
         ))}
       </div>
 
@@ -195,7 +197,7 @@ export default function Dashboard() {
           />
           <div>
             <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">This week</p>
-            <p className="mt-1 text-lg font-bold">{formatHours(myWeekHours)}</p>
+            <p className="mt-1 text-lg font-bold"><CountUp value={myWeekHours} format={(n) => formatHours(n)} /></p>
             <p className="text-xs text-muted-foreground">
               {myWeekHours >= me.availability.preferred ? 'Target reached 🎯' : `${formatHours(me.availability.preferred - myWeekHours)} to goal`}
             </p>
@@ -209,7 +211,7 @@ export default function Dashboard() {
               <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Open shifts</p>
               <Store className="h-4 w-4 text-dept-bar" />
             </div>
-            <p className="mt-3 text-3xl font-bold tabular">{open.length}</p>
+            <p className="mt-3 text-3xl font-bold tabular"><CountUp value={open.length} /></p>
             <p className="mt-1 text-sm text-muted-foreground">available to pick up nearby</p>
             <p className="mt-3 inline-flex items-center gap-1 text-xs font-medium text-dept-bar">
               Browse marketplace <ChevronRight className="h-3 w-3" />
@@ -223,7 +225,7 @@ export default function Dashboard() {
             <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Est. earnings</p>
             <DollarSign className="h-4 w-4 text-dept-support" />
           </div>
-          <p className="mt-3 text-3xl font-bold tabular">{currency(weekEarnings)}</p>
+          <p className="mt-3 text-3xl font-bold tabular"><CountUp value={weekEarnings} format={(n) => currency(n)} /></p>
           <p className="mt-1 text-sm text-muted-foreground">this week · {currency(todayEarnings)} today</p>
           <div className="mt-3">
             <Progress value={myWeekHours} max={me.availability.max} tone="success" />
@@ -389,7 +391,7 @@ export default function Dashboard() {
 
           {/* AI nudge */}
           <Link to="/assistant">
-            <Card hover className="overflow-hidden p-5">
+            <SpotlightCard className="card-base overflow-hidden p-5 transition-shadow hover:shadow-elevated">
               <div className="flex items-start gap-3">
                 <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-purple-500 text-white">
                   <Sparkles className="h-4.5 w-4.5" />
@@ -401,7 +403,7 @@ export default function Dashboard() {
                   </p>
                 </div>
               </div>
-            </Card>
+            </SpotlightCard>
           </Link>
         </div>
       </div>
@@ -414,9 +416,9 @@ export default function Dashboard() {
       >
         <TrendingUp className="h-4 w-4 text-dept-support" />
         <span>
-          <strong className="text-foreground">{working.length}</strong> on shift ·{' '}
-          <strong className="text-foreground">{open.length}</strong> open shifts ·{' '}
-          <strong className="text-foreground">{currency(weekEarnings)}</strong> projected this week
+          <strong className="text-foreground"><CountUp value={working.length} /></strong> on shift ·{' '}
+          <strong className="text-foreground"><CountUp value={open.length} /></strong> open shifts ·{' '}
+          <strong className="text-foreground"><CountUp value={weekEarnings} format={(n) => currency(n)} /></strong> projected this week
         </span>
       </motion.div>
     </div>

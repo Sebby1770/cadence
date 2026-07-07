@@ -1,6 +1,19 @@
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ChevronLeft, ChevronRight, Send, Copy, Filter, MapPin, Clock, Users } from 'lucide-react'
+import {
+  DndContext,
+  DragOverlay,
+  PointerSensor,
+  TouchSensor,
+  useSensor,
+  useSensors,
+  useDraggable,
+  useDroppable,
+  closestCenter,
+  type DragEndEvent,
+  type DragStartEvent,
+} from '@dnd-kit/core'
+import { ChevronLeft, ChevronRight, Send, Copy, Filter, MapPin, Clock, Users, Wand2 } from 'lucide-react'
 import { useStore } from '@/store/useStore'
 import { useNow } from '@/hooks/useNow'
 import { DEPARTMENTS, LOCATIONS } from '@/data/mock'
@@ -29,15 +42,24 @@ export default function Schedule() {
   const role = useStore((s) => s.role)
   const currentUserId = useStore((s) => s.currentUserId)
   const pickUpShift = useStore((s) => s.pickUpShift)
+  const moveShift = useStore((s) => s.moveShift)
   const publishRoster = useStore((s) => s.publishRoster)
   const addToast = useStore((s) => s.addToast)
 
+  const isManager = role === 'manager' || role === 'admin'
   const [view, setView] = useState<View>('week')
   const [cursor, setCursor] = useState(() => new Date())
   const [dept, setDept] = useState<'all' | DeptKey>('all')
   const [loc, setLoc] = useState<'all' | string>('all')
   const [myOnly, setMyOnly] = useState(false)
+  const [builder, setBuilder] = useState(false)
   const [selected, setSelected] = useState<Shift | null>(null)
+  const [activeId, setActiveId] = useState<string | null>(null)
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 180, tolerance: 6 } }),
+  )
 
   const match = useMemo(
     () => (s: Shift) =>
@@ -58,6 +80,18 @@ export default function Schedule() {
         : cursor.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
 
   const week = weekDates(cursor)
+  const activeShift = activeId ? shifts.find((s) => s.id === activeId) ?? null : null
+
+  const onDragStart = (e: DragStartEvent) => setActiveId(String(e.active.id))
+  const onDragEnd = (e: DragEndEvent) => {
+    setActiveId(null)
+    const overId = e.over?.id
+    if (typeof overId === 'string' && overId.startsWith('day-')) {
+      moveShift(String(e.active.id), overId.slice(4))
+    }
+  }
+
+  const weekGrid = <WeekGrid week={week} now={now} shifts={shifts} match={match} onSelect={setSelected} builder={builder} />
 
   return (
     <PageShell>
@@ -87,8 +121,17 @@ export default function Schedule() {
               onChange={setView}
               layoutId="schedule-view"
             />
-            {(role === 'manager' || role === 'admin') && (
+            {isManager && (
               <>
+                {view === 'week' && (
+                  <Button
+                    variant={builder ? 'primary' : 'outline'}
+                    size="md"
+                    onClick={() => setBuilder((b) => !b)}
+                  >
+                    <Wand2 className="h-4 w-4" /> Builder
+                  </Button>
+                )}
                 <Button variant="outline" size="md" onClick={() => addToast({ title: 'Last week copied', description: 'Draft shifts created for this week.', kind: 'success' })}>
                   <Copy className="h-4 w-4" /> Copy last week
                 </Button>
@@ -127,7 +170,24 @@ export default function Schedule() {
         </button>
       </Card>
 
-      {view === 'week' && <WeekGrid week={week} now={now} shifts={shifts} match={match} onSelect={setSelected} />}
+      {builder && view === 'week' && (
+        <div className="flex items-center gap-2 rounded-xl border border-primary/30 bg-primary/[0.06] px-3.5 py-2.5 text-[13px] text-primary">
+          <Wand2 className="h-4 w-4 shrink-0" />
+          <span><strong>Builder mode</strong> — drag any shift between days to reschedule it. Changes save as a draft; publish when you’re done.</span>
+        </div>
+      )}
+
+      {view === 'week' &&
+        (builder ? (
+          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={onDragStart} onDragEnd={onDragEnd} onDragCancel={() => setActiveId(null)}>
+            {weekGrid}
+            <DragOverlay dropAnimation={null}>
+              {activeShift ? <div className="w-40 rotate-2 opacity-95"><ShiftChip shift={activeShift} /></div> : null}
+            </DragOverlay>
+          </DndContext>
+        ) : (
+          weekGrid
+        ))}
       {view === 'day' && <DayView date={iso(cursor)} shifts={shifts} match={match} onSelect={setSelected} />}
       {view === 'month' && <MonthGrid cursor={cursor} now={now} shifts={shifts} match={match} onSelect={setSelected} />}
 
@@ -175,18 +235,38 @@ function FilterPills<T extends string>({
   )
 }
 
+function DraggableShift({ shift, onSelect }: { shift: Shift; onSelect: () => void }) {
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: shift.id })
+  return (
+    <div ref={setNodeRef} {...listeners} {...attributes} className={cn('touch-none', isDragging && 'opacity-40')}>
+      <ShiftChip shift={shift} onClick={onSelect} />
+    </div>
+  )
+}
+
+function DroppableDay({ dateStr, children }: { dateStr: string; children: React.ReactNode }) {
+  const { setNodeRef, isOver } = useDroppable({ id: `day-${dateStr}` })
+  return (
+    <div ref={setNodeRef} className={cn('min-h-[120px] space-y-1.5 rounded-xl p-1 transition-colors', isOver && 'bg-primary/10 ring-2 ring-primary/40')}>
+      {children}
+    </div>
+  )
+}
+
 function WeekGrid({
   week,
   now,
   shifts,
   match,
   onSelect,
+  builder,
 }: {
   week: string[]
   now: Date
   shifts: Shift[]
   match: (s: Shift) => boolean
   onSelect: (s: Shift) => void
+  builder?: boolean
 }) {
   return (
     <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-7">
@@ -194,8 +274,19 @@ function WeekGrid({
         const date = new Date(`${d}T00:00`)
         const today = d === iso(now)
         const day = shiftsOn(shifts, d).filter(match).sort((a, b) => a.start - b.start)
+        const chips = day.length ? (
+          day.map((s) =>
+            builder ? (
+              <DraggableShift key={s.id} shift={s} onSelect={() => onSelect(s)} />
+            ) : (
+              <ShiftChip key={s.id} shift={s} onClick={() => onSelect(s)} />
+            ),
+          )
+        ) : (
+          <p className="rounded-lg border border-dashed border-border py-4 text-center text-[11px] text-muted-foreground">No shifts</p>
+        )
         return (
-          <div key={d} className="min-h-[160px]">
+          <div key={d} className={builder ? '' : 'min-h-[160px]'}>
             <div className={cn('mb-2 flex items-center justify-between rounded-lg px-2 py-1.5', today && 'bg-primary/10')}>
               <span className="text-[11px] font-semibold uppercase text-muted-foreground">
                 {date.toLocaleDateString('en-US', { weekday: 'short' })}
@@ -204,13 +295,7 @@ function WeekGrid({
                 {date.getDate()}
               </span>
             </div>
-            <div className="space-y-1.5">
-              {day.length ? (
-                day.map((s) => <ShiftChip key={s.id} shift={s} onClick={() => onSelect(s)} />)
-              ) : (
-                <p className="rounded-lg border border-dashed border-border py-4 text-center text-[11px] text-muted-foreground">No shifts</p>
-              )}
-            </div>
+            {builder ? <DroppableDay dateStr={d}>{chips}</DroppableDay> : <div className="space-y-1.5">{chips}</div>}
           </div>
         )
       })}

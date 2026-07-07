@@ -6,6 +6,7 @@ import { Topbar } from './Topbar'
 import { BottomNav } from './BottomNav'
 import { CommandPalette } from './CommandPalette'
 import { Toaster, Skeleton } from '@/components/ui'
+import { Aurora, Grain } from '@/components/fx'
 
 function PageFallback() {
   return (
@@ -38,8 +39,11 @@ export function AppShell() {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Ambient aurora backdrop */}
-      <div className="pointer-events-none fixed inset-0 -z-10 bg-aurora opacity-[0.55]" />
+      {/* Ambient animated backdrop */}
+      <div className="pointer-events-none fixed inset-0 -z-10">
+        <Aurora intensity={0.85} />
+        <Grain opacity={0.03} />
+      </div>
       <Sidebar />
       <div className="lg:pl-[260px]">
         <Topbar onOpenCommand={() => setCmdOpen(true)} />

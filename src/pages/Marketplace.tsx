@@ -16,8 +16,9 @@ import {
   shiftPay,
 } from '@/data/selectors'
 import { cn, currency, minutesToLabel } from '@/lib/utils'
-import { fullDate } from '@/lib/dates'
+import { fullDate, iso } from '@/lib/dates'
 import { Avatar, Badge, Button, Card, DeptDot, EmptyState, Modal, Segmented } from '@/components/ui'
+import { CountUp, Tilt, SpotlightCard } from '@/components/fx'
 import { PageHeader, PageShell } from '@/components/layout/PageHeader'
 
 type Sort = 'soon' | 'pay' | 'near'
@@ -36,7 +37,8 @@ export default function Marketplace() {
   const [detail, setDetail] = useState<Shift | null>(null)
   const [claimed, setClaimed] = useState<Set<string>>(new Set())
 
-  const open = openShifts(shifts)
+  const todayIso = iso(new Date())
+  const open = openShifts(shifts).filter((s) => s.date >= todayIso)
 
   const filtered = useMemo(() => {
     const ql = q.trim().toLowerCase()
@@ -70,7 +72,7 @@ export default function Marketplace() {
     <PageShell>
       <PageHeader
         title="Shift Marketplace"
-        subtitle={`${filtered.length} open shifts · ${currency(potential)} up for grabs`}
+        subtitle={<><CountUp value={filtered.length} /> open shifts · <CountUp value={potential} format={(n) => currency(n)} /> up for grabs</>}
         actions={
           <Segmented
             options={[
@@ -129,7 +131,8 @@ export default function Marketplace() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: Math.min(i * 0.02, 0.4), type: 'spring', stiffness: 260, damping: 26 }}
               >
-                <Card hover className="flex h-full flex-col overflow-hidden">
+                <Tilt className="h-full" max={5}>
+                <SpotlightCard className="card-base flex h-full flex-col overflow-hidden transition-shadow hover:shadow-elevated">
                   <div className={cn('h-1.5 w-full', `bg-dept-${dep}`)} />
                   <div className="flex flex-1 flex-col p-4">
                     <div className="flex items-start justify-between gap-2">
@@ -181,7 +184,8 @@ export default function Marketplace() {
                       </Button>
                     </div>
                   </div>
-                </Card>
+                </SpotlightCard>
+                </Tilt>
               </motion.div>
             )
           })}

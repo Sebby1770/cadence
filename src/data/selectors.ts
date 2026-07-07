@@ -62,7 +62,8 @@ export function shiftsForEmployee(shifts: Shift[], employeeId: string) {
 }
 
 export function openShifts(shifts: Shift[]) {
-  return shifts.filter((s) => s.status === 'open')
+  const today = isoOf(new Date())
+  return shifts.filter((s) => s.status === 'open' && s.date >= today)
 }
 
 /** The employee's next upcoming shift relative to now. */
