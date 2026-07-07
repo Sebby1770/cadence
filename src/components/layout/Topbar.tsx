@@ -10,6 +10,9 @@ export function Topbar({ onOpenCommand }: { onOpenCommand: () => void }) {
   const navigate = useNavigate()
   const me = getEmployee(useStore((s) => s.currentUserId))
   const unread = useStore((s) => s.notifications.filter((n) => !n.read).length)
+  const backend = useStore((s) => s.backend)
+  const hydrated = useStore((s) => s.hydrated)
+  const live = backend === 'supabase' && hydrated
 
   return (
     <header className="sticky top-0 z-30 flex h-16 items-center gap-3 border-b border-border bg-background/70 px-4 backdrop-blur-xl lg:px-8">
@@ -37,6 +40,15 @@ export function Topbar({ onOpenCommand }: { onOpenCommand: () => void }) {
       </button>
 
       <div className="flex items-center gap-1">
+        <span
+          title={backend === 'supabase' ? 'Data is live from Supabase' : 'Running on in-memory demo data'}
+          className={`hidden items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold sm:inline-flex ${
+            backend === 'supabase' ? 'bg-success/12 text-success' : 'bg-secondary text-muted-foreground'
+          }`}
+        >
+          <span className={`h-1.5 w-1.5 rounded-full ${backend === 'supabase' ? 'bg-success' : 'bg-muted-foreground'} ${live ? 'animate-pulse-ring' : ''}`} />
+          {backend === 'supabase' ? 'Live' : 'Demo'}
+        </span>
         <Link
           to="/assistant"
           className="hidden h-9 items-center gap-1.5 rounded-xl bg-gradient-to-r from-primary/12 to-purple-500/12 px-3 text-[13px] font-medium text-primary transition-colors hover:from-primary/20 hover:to-purple-500/20 sm:inline-flex"

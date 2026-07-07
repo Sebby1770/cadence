@@ -28,6 +28,7 @@ import {
 import { currency } from '@/lib/utils'
 import { addDays, iso, weekDates } from '@/lib/dates'
 import { Card, Segmented } from '@/components/ui'
+import { CountUp } from '@/components/fx'
 import { PageHeader, PageShell } from '@/components/layout/PageHeader'
 
 const CHART = {
@@ -109,11 +110,11 @@ export default function Analytics() {
       />
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
-        <Kpi icon={Clock} label="Scheduled hours" value={`${Math.round(scheduledHours)}h`} tint="text-primary" />
-        <Kpi icon={DollarSign} label="Labour cost" value={currency(weekCost)} tint="text-dept-support" />
-        <Kpi icon={Store} label="Open shifts" value={String(openCount)} tint="text-dept-bar" />
-        <Kpi icon={Gauge} label="Avg coverage" value={`${Math.round(avgCoverage * 100)}%`} tint="text-dept-floor" />
-        <Kpi icon={AlertTriangle} label="Overtime risk" value={String(overtime)} tint="text-warning" />
+        <Kpi icon={Clock} label="Scheduled hours" value={Math.round(scheduledHours)} format={(n) => `${Math.round(n)}h`} tint="text-primary" />
+        <Kpi icon={DollarSign} label="Labour cost" value={weekCost} format={(n) => currency(n)} tint="text-dept-support" />
+        <Kpi icon={Store} label="Open shifts" value={openCount} tint="text-dept-bar" />
+        <Kpi icon={Gauge} label="Avg coverage" value={Math.round(avgCoverage * 100)} format={(n) => `${Math.round(n)}%`} tint="text-dept-floor" />
+        <Kpi icon={AlertTriangle} label="Overtime risk" value={overtime} tint="text-warning" />
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
@@ -212,11 +213,11 @@ export default function Analytics() {
   )
 }
 
-function Kpi({ icon: Icon, label, value, tint }: { icon: typeof Clock; label: string; value: string; tint: string }) {
+function Kpi({ icon: Icon, label, value, format, tint }: { icon: typeof Clock; label: string; value: number; format?: (n: number) => string; tint: string }) {
   return (
     <Card className="p-4">
       <Icon className={`h-4 w-4 ${tint}`} />
-      <p className="mt-2 text-xl font-bold tabular">{value}</p>
+      <p className="mt-2 text-xl font-bold tabular"><CountUp value={value} format={format} /></p>
       <p className="text-[11px] text-muted-foreground">{label}</p>
     </Card>
   )

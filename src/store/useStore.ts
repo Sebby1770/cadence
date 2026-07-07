@@ -10,6 +10,8 @@ import {
   SHIFTS,
   SWAP_REQUESTS,
 } from '@/data/mock'
+import { isSupabaseEnabled } from '@/lib/supabase'
+import { fetchOperational, remote, subscribeOperational } from '@/data/remote'
 import type {
   Announcement,
   AppNotification,
@@ -41,10 +43,13 @@ export interface ClockState {
 
 let seq = 0
 const uid = (p: string) => `${p}-${Date.now().toString(36)}-${seq++}`
+let unsubscribe: (() => void) | null = null
 
 interface StoreState {
   currentUserId: string
   role: Role
+  backend: 'mock' | 'supabase'
+  hydrated: boolean
   shifts: Shift[]
   notifications: AppNotification[]
   swaps: SwapRequest[]
@@ -54,6 +59,10 @@ interface StoreState {
   announcements: Announcement[]
   toasts: Toast[]
   clock: ClockState
+
+  hydrate: () => Promise<void>
+  startRealtime: () => void
+  stopRealtime: () => void
 
   setRole: (role: Role) => void
   addToast: (t: Omit<Toast, 'id'>) => void
@@ -100,6 +109,8 @@ export const useStore = create<StoreState>()(
     (set, get) => ({
       currentUserId: CURRENT_USER_ID,
       role: 'manager',
+      backend: isSupabaseEnabled ? 'supabase' : 'mock',
+      hydrated: !isSupabaseEnabled,
       shifts: SHIFTS,
       notifications: NOTIFICATIONS,
       swaps: SWAP_REQUESTS,
@@ -110,6 +121,19 @@ export const useStore = create<StoreState>()(
       toasts: [],
       clock: initialClock,
 
+      hydrate: async () => {
+        const data = await fetchOperational()
+        if (data) set({ ...data, hydrated: true })
+      },
+      startRealtime: () => {
+        if (unsubscribe || !isSupabaseEnabled) return
+        unsubscribe = subscribeOperational(() => get().hydrate())
+      },
+      stopRealtime: () => {
+        unsubscribe?.()
+        unsubscribe = null
+      },
+
       setRole: (role) => set({ role }),
 
       addToast: (t) => {
@@ -119,146 +143,132 @@ export const useStore = create<StoreState>()(
       },
       dismissToast: (id) => set((s) => ({ toasts: s.toasts.filter((x) => x.id !== id) })),
 
-      pickUpShift: (shiftId) =>
-        set((s) => {
-          const shifts = s.shifts.map((sh) =>
-            sh.id === shiftId ? { ...sh, employeeId: s.currentUserId, status: 'pending' as const } : sh,
-          )
-          get().addToast({ title: 'Shift request sent', description: 'Your manager will confirm shortly.', kind: 'success' })
-          return {
-            shifts,
-            notifications: [
-              {
-                id: uid('n'),
-                kind: 'shift-picked',
-                title: 'Shift pick-up requested',
-                body: 'You requested an open shift. Awaiting manager approval.',
-                createdAt: new Date().toISOString(),
-                read: false,
-              },
-              ...s.notifications,
-            ],
-          }
-        }),
-
-      releaseShift: (shiftId) =>
+      pickUpShift: (shiftId) => {
+        const me = get().currentUserId
+        const note: AppNotification = {
+          id: uid('n'),
+          kind: 'shift-picked',
+          title: 'Shift pick-up requested',
+          body: 'You requested an open shift. Awaiting manager approval.',
+          createdAt: new Date().toISOString(),
+          read: false,
+        }
         set((s) => ({
-          shifts: s.shifts.map((sh) =>
-            sh.id === shiftId ? { ...sh, employeeId: null, status: 'open' as const } : sh,
-          ),
-        })),
-
-      moveShift: (shiftId, newDate) =>
-        set((s) => {
-          const shift = s.shifts.find((sh) => sh.id === shiftId)
-          if (!shift || shift.date === newDate) return {}
-          get().addToast({ title: 'Shift rescheduled', description: 'Remember to re-publish the roster.', kind: 'success' })
-          return { shifts: s.shifts.map((sh) => (sh.id === shiftId ? { ...sh, date: newDate, status: 'draft' as const } : sh)) }
-        }),
-
-      assignShift: (shiftId, employeeId) =>
-        set((s) => ({
-          shifts: s.shifts.map((sh) =>
-            sh.id === shiftId
-              ? { ...sh, employeeId, status: employeeId ? ('draft' as const) : ('open' as const) }
-              : sh,
-          ),
-        })),
-
-      offerShift: (shiftId, kind, toEmployeeId = null, message) => {
-        set((s) => ({
-          swaps: [
-            {
-              id: uid('sw'),
-              shiftId,
-              fromEmployeeId: s.currentUserId,
-              toEmployeeId,
-              kind,
-              status: 'pending',
-              createdAt: new Date().toISOString(),
-              message,
-            },
-            ...s.swaps,
-          ],
+          shifts: s.shifts.map((sh) => (sh.id === shiftId ? { ...sh, employeeId: me, status: 'pending' as const } : sh)),
+          notifications: [note, ...s.notifications],
         }))
-        get().addToast({ title: 'Shift offered', description: kind === 'offer-all' ? 'Offered to all qualified teammates.' : 'Your teammate has been notified.', kind: 'success' })
+        get().addToast({ title: 'Shift request sent', description: 'Your manager will confirm shortly.', kind: 'success' })
+        remote.updateShift(shiftId, { employee_id: me, status: 'pending' })
+        remote.insertNotification(note)
       },
 
-      respondToSwap: (swapId, accept) =>
-        set((s) => {
-          const swap = s.swaps.find((x) => x.id === swapId)
-          get().addToast({
-            title: accept ? 'Swap accepted' : 'Swap declined',
-            kind: accept ? 'success' : 'info',
-          })
-          return {
-            swaps: s.swaps.map((x) => (x.id === swapId ? { ...x, status: accept ? 'approved' : 'declined' } : x)),
-            shifts:
-              accept && swap
-                ? s.shifts.map((sh) => (sh.id === swap.shiftId ? { ...sh, employeeId: s.currentUserId, status: 'confirmed' as const } : sh))
-                : s.shifts,
-          }
-        }),
+      releaseShift: (shiftId) => {
+        set((s) => ({
+          shifts: s.shifts.map((sh) => (sh.id === shiftId ? { ...sh, employeeId: null, status: 'open' as const } : sh)),
+        }))
+        remote.updateShift(shiftId, { employee_id: null, status: 'open' })
+      },
+
+      moveShift: (shiftId, newDate) => {
+        const shift = get().shifts.find((sh) => sh.id === shiftId)
+        if (!shift || shift.date === newDate) return
+        set((s) => ({ shifts: s.shifts.map((sh) => (sh.id === shiftId ? { ...sh, date: newDate, status: 'draft' as const } : sh)) }))
+        get().addToast({ title: 'Shift rescheduled', description: 'Remember to re-publish the roster.', kind: 'success' })
+        remote.updateShift(shiftId, { date: newDate, status: 'draft' })
+      },
+
+      assignShift: (shiftId, employeeId) => {
+        const status = employeeId ? 'draft' : 'open'
+        set((s) => ({ shifts: s.shifts.map((sh) => (sh.id === shiftId ? { ...sh, employeeId, status: status as Shift['status'] } : sh)) }))
+        remote.updateShift(shiftId, { employee_id: employeeId, status })
+      },
+
+      offerShift: (shiftId, kind, toEmployeeId = null, message) => {
+        const swap: SwapRequest = {
+          id: uid('sw'),
+          shiftId,
+          fromEmployeeId: get().currentUserId,
+          toEmployeeId,
+          kind,
+          status: 'pending',
+          createdAt: new Date().toISOString(),
+          message,
+        }
+        set((s) => ({ swaps: [swap, ...s.swaps] }))
+        get().addToast({ title: 'Shift offered', description: kind === 'offer-all' ? 'Offered to all qualified teammates.' : 'Your teammate has been notified.', kind: 'success' })
+        remote.insertSwap(swap)
+      },
+
+      respondToSwap: (swapId, accept) => {
+        const me = get().currentUserId
+        const swap = get().swaps.find((x) => x.id === swapId)
+        const status = accept ? 'approved' : 'declined'
+        set((s) => ({
+          swaps: s.swaps.map((x) => (x.id === swapId ? { ...x, status } : x)),
+          shifts: accept && swap ? s.shifts.map((sh) => (sh.id === swap.shiftId ? { ...sh, employeeId: me, status: 'confirmed' as const } : sh)) : s.shifts,
+        }))
+        get().addToast({ title: accept ? 'Swap accepted' : 'Swap declined', kind: accept ? 'success' : 'info' })
+        remote.updateSwap(swapId, status)
+        if (accept && swap) remote.updateShift(swap.shiftId, { employee_id: me, status: 'confirmed' })
+      },
 
       approveSwap: (swapId) => {
         set((s) => ({ swaps: s.swaps.map((x) => (x.id === swapId ? { ...x, status: 'approved' } : x)) }))
         get().addToast({ title: 'Swap approved', kind: 'success' })
+        remote.updateSwap(swapId, 'approved')
       },
       declineSwap: (swapId) => {
         set((s) => ({ swaps: s.swaps.map((x) => (x.id === swapId ? { ...x, status: 'declined' } : x)) }))
         get().addToast({ title: 'Swap declined', kind: 'info' })
+        remote.updateSwap(swapId, 'declined')
       },
 
       requestLeave: (input) => {
-        set((s) => ({
-          leaves: [
-            { id: uid('lr'), employeeId: s.currentUserId, status: 'pending', createdAt: new Date().toISOString(), ...input },
-            ...s.leaves,
-          ],
-        }))
+        const row: LeaveRequest = { id: uid('lr'), employeeId: get().currentUserId, status: 'pending', createdAt: new Date().toISOString(), ...input }
+        set((s) => ({ leaves: [row, ...s.leaves] }))
         get().addToast({ title: 'Leave request submitted', description: 'You’ll be notified once it’s reviewed.', kind: 'success' })
+        remote.insertLeave(row)
       },
       approveLeave: (id) => {
         set((s) => ({ leaves: s.leaves.map((l) => (l.id === id ? { ...l, status: 'approved' } : l)) }))
         get().addToast({ title: 'Leave approved', kind: 'success' })
+        remote.updateLeave(id, 'approved')
       },
       declineLeave: (id) => {
         set((s) => ({ leaves: s.leaves.map((l) => (l.id === id ? { ...l, status: 'declined' } : l)) }))
         get().addToast({ title: 'Leave declined', kind: 'info' })
+        remote.updateLeave(id, 'declined')
       },
 
-      notify: (n) =>
-        set((s) => ({
-          notifications: [
-            { id: uid('n'), createdAt: new Date().toISOString(), read: false, ...n },
-            ...s.notifications,
-          ],
-        })),
-      markRead: (id) => set((s) => ({ notifications: s.notifications.map((n) => (n.id === id ? { ...n, read: true } : n)) })),
-      markAllRead: () => set((s) => ({ notifications: s.notifications.map((n) => ({ ...n, read: true })) })),
+      notify: (n) => {
+        const row: AppNotification = { id: uid('n'), createdAt: new Date().toISOString(), read: false, ...n }
+        set((s) => ({ notifications: [row, ...s.notifications] }))
+        remote.insertNotification(row)
+      },
+      markRead: (id) => {
+        set((s) => ({ notifications: s.notifications.map((n) => (n.id === id ? { ...n, read: true } : n)) }))
+        remote.markRead(id)
+      },
+      markAllRead: () => {
+        set((s) => ({ notifications: s.notifications.map((n) => ({ ...n, read: true })) }))
+        remote.markAllRead()
+      },
 
-      sendMessage: (threadId, body) =>
-        set((s) => ({
-          threads: s.threads.map((t) =>
-            t.id === threadId
-              ? {
-                  ...t,
-                  messages: [...t.messages, { id: uid('m'), senderId: s.currentUserId, body, createdAt: new Date().toISOString() }],
-                }
-              : t,
-          ),
-        })),
-      readThread: (threadId) =>
-        set((s) => ({ threads: s.threads.map((t) => (t.id === threadId ? { ...t, unread: 0 } : t)) })),
+      sendMessage: (threadId, body) => {
+        const msg = { id: uid('m'), senderId: get().currentUserId, body, createdAt: new Date().toISOString() }
+        set((s) => ({ threads: s.threads.map((t) => (t.id === threadId ? { ...t, messages: [...t.messages, msg] } : t)) }))
+        remote.insertMessage(threadId, msg)
+      },
+      readThread: (threadId) => {
+        set((s) => ({ threads: s.threads.map((t) => (t.id === threadId ? { ...t, unread: 0 } : t)) }))
+        remote.readThread(threadId)
+      },
 
       addRecognition: (toId, message) => {
-        set((s) => ({
-          recognition: [
-            { id: uid('r'), fromId: s.currentUserId, toId, message, createdAt: new Date().toISOString(), reactions: 0 },
-            ...s.recognition,
-          ],
-        }))
+        const row: Recognition = { id: uid('r'), fromId: get().currentUserId, toId, message, createdAt: new Date().toISOString(), reactions: 0 }
+        set((s) => ({ recognition: [row, ...s.recognition] }))
         get().addToast({ title: 'Recognition posted 🎉', kind: 'success' })
+        remote.insertRecognition(row)
       },
 
       publishRoster: () => get().addToast({ title: 'Roster published', description: 'The team has been notified.', kind: 'success' }),
@@ -284,8 +294,9 @@ export const useStore = create<StoreState>()(
     }),
     {
       name: 'cadence-store',
-      version: 3,
+      version: 4,
       storage: createJSONStorage(() => localStorage),
+      migrate: (persisted) => persisted as Partial<StoreState>,
       partialize: (s) => ({ role: s.role, clock: s.clock }),
     },
   ),

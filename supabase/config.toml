@@ -1,0 +1,17 @@
+# Minimal Supabase CLI config. Run `supabase init` to regenerate the full
+# default config for your CLI version if needed.
+project_id = "cadence"
+
+[db]
+port = 54322
+major_version = 17
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public"]
+
+[auth]
+enabled = true
+# Enable anonymous sign-ins if you want a frictionless "guest" mode.
+enable_anonymous_sign_ins = false

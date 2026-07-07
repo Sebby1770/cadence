@@ -61,6 +61,42 @@ npm run build    # type-check + production build
 npm run preview  # preview the build
 ```
 
+By default Cadence runs on rich in-memory demo data — no backend required.
+
+## 🗄️ Supabase backend (persistent, multi-user)
+
+Cadence can run against a real **Supabase** Postgres backend so data persists
+and is shared live across users. It's driven entirely by two env vars:
+
+```bash
+cp .env.example .env
+# then set:
+VITE_SUPABASE_URL=https://YOUR-ref.supabase.co
+VITE_SUPABASE_ANON_KEY=your-anon-or-publishable-key
+```
+
+When those are present the app hydrates from Supabase, writes every action
+back through the API, and subscribes to **realtime** changes so multiple
+sessions stay in sync. When they're absent it falls back to the demo data —
+the topbar shows a **Live** / **Demo** pill so you always know which.
+
+Provision from scratch:
+
+```bash
+# schema + policies + realtime
+supabase link --project-ref YOUR-ref
+supabase db push                 # applies supabase/migrations/*
+# seed the roster + shifts from the mock dataset
+VITE_SUPABASE_URL=... VITE_SUPABASE_ANON_KEY=... npx vite-node scripts/seed-apply.ts
+```
+
+Schema lives in [`supabase/migrations/`](supabase/migrations); the seed is
+generated from the exact mock data (`scripts/gen-seed.ts` → `supabase/seed.sql`).
+Reference tables (departments, positions, locations, employees, badges) are
+read-only; operational tables (shifts, swaps, leave, notifications, chat,
+recognition) are readable/writable and realtime-enabled. Row-level security is
+on for every table.
+
 ## 🗂️ Structure
 
 ```

@@ -7,6 +7,7 @@ import { BottomNav } from './BottomNav'
 import { CommandPalette } from './CommandPalette'
 import { Toaster, Skeleton } from '@/components/ui'
 import { Aurora, Grain } from '@/components/fx'
+import { useStore } from '@/store/useStore'
 
 function PageFallback() {
   return (
@@ -25,6 +26,9 @@ function PageFallback() {
 export function AppShell() {
   const [cmdOpen, setCmdOpen] = useState(false)
   const location = useLocation()
+  const hydrate = useStore((s) => s.hydrate)
+  const startRealtime = useStore((s) => s.startRealtime)
+  const stopRealtime = useStore((s) => s.stopRealtime)
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -36,6 +40,12 @@ export function AppShell() {
     document.addEventListener('keydown', onKey)
     return () => document.removeEventListener('keydown', onKey)
   }, [])
+
+  useEffect(() => {
+    hydrate()
+    startRealtime()
+    return () => stopRealtime()
+  }, [hydrate, startRealtime, stopRealtime])
 
   return (
     <div className="min-h-screen bg-background">
