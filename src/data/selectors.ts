@@ -1,28 +1,18 @@
 import { format } from 'date-fns'
-import {
-  DEPARTMENTS,
-  EMPLOYEES,
-  LOCATIONS,
-  POSITIONS,
-} from './mock'
+import { EMPLOYEES, refDepartment, refEmployee, refLocation, refPosition } from './mock'
 import type { Employee, Shift, WorkStatus } from './types'
 
-const empById = new Map(EMPLOYEES.map((e) => [e.id, e]))
-const posById = new Map(POSITIONS.map((p) => [p.id, p]))
-const deptById = new Map(DEPARTMENTS.map((d) => [d.id, d]))
-const locById = new Map(LOCATIONS.map((l) => [l.id, l]))
+export const getEmployee = (id: string | null | undefined) => refEmployee(id)
+export const getPosition = (id: string) => refPosition(id)
+export const getDepartment = (id: string) => refDepartment(id)
+export const getLocation = (id: string) => refLocation(id)
 
-export const getEmployee = (id: string | null | undefined) => (id ? empById.get(id) : undefined)
-export const getPosition = (id: string) => posById.get(id)
-export const getDepartment = (id: string) => deptById.get(id)
-export const getLocation = (id: string) => locById.get(id)
+export const positionName = (id: string) => refPosition(id)?.name ?? 'Team member'
+export const locationName = (id: string) => refLocation(id)?.name ?? 'Unknown'
+export const locationShort = (id: string) => refLocation(id)?.short ?? '—'
+export const departmentName = (id: string) => refDepartment(id)?.name ?? 'Team'
 
-export const positionName = (id: string) => posById.get(id)?.name ?? 'Team member'
-export const locationName = (id: string) => locById.get(id)?.name ?? 'Unknown'
-export const locationShort = (id: string) => locById.get(id)?.short ?? '—'
-export const departmentName = (id: string) => deptById.get(id)?.name ?? 'Team'
-
-export const departmentKey = (id: string) => deptById.get(id)?.key ?? 'floor'
+export const departmentKey = (id: string) => refDepartment(id)?.key ?? 'floor'
 
 /** Minutes of paid time in a shift (net of unpaid break). */
 export function shiftDuration(shift: Shift) {
@@ -35,8 +25,8 @@ export function shiftHours(shift: Shift) {
 
 /** Estimated gross pay for a shift, at the position rate. */
 export function shiftPay(shift: Shift) {
-  const rate = posById.get(shift.positionId)?.rate ?? 18
-  return (shiftHours(shift) * rate)
+  const rate = refPosition(shift.positionId)?.rate ?? 18
+  return shiftHours(shift) * rate
 }
 
 export type TimeBlock = 'morning' | 'afternoon' | 'evening' | 'night'
@@ -124,8 +114,8 @@ export function workingNow(shifts: Shift[], now = new Date()) {
     (s) => s.date === todayIso && s.employeeId && nowMin >= s.start && nowMin < s.end,
   )
   return active
-    .map((s) => ({ shift: s, employee: empById.get(s.employeeId!)! }))
-    .filter((x) => x.employee)
+    .map((s) => ({ shift: s, employee: refEmployee(s.employeeId!) }))
+    .filter((x): x is { shift: Shift; employee: Employee } => Boolean(x.employee))
 }
 
 /** Total labour cost for a set of shifts. */
@@ -135,7 +125,7 @@ export function laborCost(shifts: Shift[]) {
 
 /** Coverage ratio (0-1+) for a location on a date vs its headcount target. */
 export function coverage(shifts: Shift[], locationId: string, dateStr: string) {
-  const loc = locById.get(locationId)
+  const loc = refLocation(locationId)
   if (!loc) return 1
   const scheduled = shiftsOn(shifts, dateStr).filter(
     (s) => s.locationId === locationId && s.employeeId,

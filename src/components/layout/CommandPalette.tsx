@@ -22,6 +22,7 @@ interface Cmd {
 export function CommandPalette({ open, onClose }: { open: boolean; onClose: () => void }) {
   const navigate = useNavigate()
   const role = useStore((s) => s.role)
+  const activeCompanyId = useStore((s) => s.activeCompanyId)
   const [query, setQuery] = useState('')
   const [active, setActive] = useState(0)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -50,7 +51,7 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
       to: `/locations?focus=${l.id}`,
     }))
     return [...nav, ...people, ...places]
-  }, [role])
+  }, [role, activeCompanyId])
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()

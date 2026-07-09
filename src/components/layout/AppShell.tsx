@@ -5,6 +5,7 @@ import { Sidebar } from './Sidebar'
 import { Topbar } from './Topbar'
 import { BottomNav } from './BottomNav'
 import { CommandPalette } from './CommandPalette'
+import { CompanyOnboarding } from './CompanySwitcher'
 import { Toaster, Skeleton } from '@/components/ui'
 import { Aurora, Grain } from '@/components/fx'
 import { useStore } from '@/store/useStore'
@@ -29,6 +30,7 @@ export function AppShell() {
   const hydrate = useStore((s) => s.hydrate)
   const startRealtime = useStore((s) => s.startRealtime)
   const stopRealtime = useStore((s) => s.stopRealtime)
+  const activeCompanyId = useStore((s) => s.activeCompanyId)
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -60,7 +62,7 @@ export function AppShell() {
         <main className="px-4 pb-28 pt-6 lg:px-8 lg:pb-12">
           <AnimatePresence mode="wait">
             <motion.div
-              key={location.pathname}
+              key={activeCompanyId + ':' + location.pathname}
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -6 }}
@@ -75,6 +77,7 @@ export function AppShell() {
       </div>
       <BottomNav />
       <CommandPalette open={cmdOpen} onClose={() => setCmdOpen(false)} />
+      <CompanyOnboarding />
       <Toaster />
     </div>
   )

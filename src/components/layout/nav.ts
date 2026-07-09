@@ -14,6 +14,7 @@ import {
   Shield,
   Sparkles,
   Repeat2,
+  History,
   type LucideIcon,
 } from 'lucide-react'
 import type { Role } from '@/data/types'
@@ -66,6 +67,7 @@ export const NAV: NavGroup[] = [
     label: 'Manage',
     items: [
       { to: '/analytics', label: 'Analytics', icon: BarChart3, roles: ['manager', 'admin'] },
+      { to: '/activity', label: 'Activity log', icon: History, roles: ['manager', 'admin'] },
       { to: '/admin', label: 'Admin', icon: Shield, roles: ['admin'] },
     ],
   },

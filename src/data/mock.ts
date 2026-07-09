@@ -14,13 +14,15 @@ import type {
   Role,
   Shift,
   SwapRequest,
+  Company,
+  ReferenceData,
 } from './types'
 
 /* ------------------------------------------------------------------ *
  *  Static reference data
  * ------------------------------------------------------------------ */
 
-export const DEPARTMENTS: Department[] = [
+export let DEPARTMENTS: Department[] = [
   { id: 'd-floor', name: 'Floor & Café', key: 'floor' },
   { id: 'd-kitchen', name: 'Kitchen', key: 'kitchen' },
   { id: 'd-bar', name: 'Bar', key: 'bar' },
@@ -29,7 +31,7 @@ export const DEPARTMENTS: Department[] = [
   { id: 'd-mgmt', name: 'Management', key: 'management' },
 ]
 
-export const POSITIONS: Position[] = [
+export let POSITIONS: Position[] = [
   { id: 'p-barista', name: 'Barista', departmentId: 'd-floor', rate: 19 },
   { id: 'p-server', name: 'Server', departmentId: 'd-floor', rate: 18 },
   { id: 'p-host', name: 'Host', departmentId: 'd-floor', rate: 17 },
@@ -47,7 +49,7 @@ export const POSITIONS: Position[] = [
   { id: 'p-manager', name: 'Store Manager', departmentId: 'd-mgmt', rate: 38 },
 ]
 
-export const LOCATIONS: Location[] = [
+export let LOCATIONS: Location[] = [
   {
     id: 'l-flagship',
     name: 'Downtown Flagship',
@@ -100,7 +102,7 @@ export const LOCATIONS: Location[] = [
   },
 ]
 
-export const BADGES: BadgeDef[] = [
+export let BADGES: BadgeDef[] = [
   { id: 'b-punctual', name: 'Always On Time', description: '30 shifts with zero late clock-ins.', icon: 'Clock', color: '152 62% 42%' },
   { id: 'b-helper', name: 'Team Player', description: 'Covered 10+ shifts for coworkers.', icon: 'HeartHandshake', color: '356 72% 56%' },
   { id: 'b-pickup', name: 'Shift Hero', description: 'Picked up 15 open shifts.', icon: 'Zap', color: '38 92% 50%' },
@@ -170,7 +172,7 @@ function pick<T>(arr: T[], seed: string, count: number): T[] {
   return scored.slice(0, count).map((x) => x.v)
 }
 
-export const EMPLOYEES: Employee[] = ROSTER.map((seed, i): Employee => {
+export let EMPLOYEES: Employee[] = ROSTER.map((seed, i): Employee => {
   const [name, departmentId, positionId, role = 'employee'] = seed
   const firstName = name.split(' ')[0]
   const id = `e${i + 1}`
@@ -506,3 +508,57 @@ export const CHAT_THREADS: ChatThread[] = [
 
 export const OPEN_SHIFT_COUNT = openShifts.length
 export const TODAY_ISO = isoDate(now)
+
+/* ------------------------------------------------------------------ *
+ *  Reference-data registry (swappable per company)
+ *
+ *  Pages import EMPLOYEES/LOCATIONS/… as live bindings; selectors read
+ *  through the accessors below. `setReferenceData` swaps the whole
+ *  reference set when the active company changes, then pages remount.
+ * ------------------------------------------------------------------ */
+
+let _empById = new Map<string, Employee>()
+let _posById = new Map<string, Position>()
+let _deptById = new Map<string, Department>()
+let _locById = new Map<string, Location>()
+
+function rebuildRefIndex() {
+  _empById = new Map(EMPLOYEES.map((e) => [e.id, e]))
+  _posById = new Map(POSITIONS.map((p) => [p.id, p]))
+  _deptById = new Map(DEPARTMENTS.map((d) => [d.id, d]))
+  _locById = new Map(LOCATIONS.map((l) => [l.id, l]))
+}
+rebuildRefIndex()
+
+export const refEmployee = (id?: string | null) => (id ? _empById.get(id) : undefined)
+export const refPosition = (id: string) => _posById.get(id)
+export const refDepartment = (id: string) => _deptById.get(id)
+export const refLocation = (id: string) => _locById.get(id)
+
+export function setReferenceData(d: ReferenceData) {
+  EMPLOYEES = d.employees
+  POSITIONS = d.positions
+  DEPARTMENTS = d.departments
+  LOCATIONS = d.locations
+  BADGES = d.badges.length ? d.badges : BADGES
+  rebuildRefIndex()
+}
+
+/** The bundled demo company (used in mock mode and as the shared showcase tenant). */
+export const DEMO_COMPANY: Company = {
+  id: 'c-demo',
+  name: 'Cadence Coffee Co.',
+  slug: 'demo',
+  joinCode: 'DEMO24',
+  accent: '245 68% 60%',
+  ownerEmployeeId: 'e1',
+  createdAt: isoDate(RANGE_START),
+}
+
+export const DEMO_REFERENCE: ReferenceData = {
+  employees: EMPLOYEES,
+  positions: POSITIONS,
+  departments: DEPARTMENTS,
+  locations: LOCATIONS,
+  badges: BADGES,
+}

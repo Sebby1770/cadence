@@ -7,6 +7,7 @@ import { cn } from '@/lib/utils'
 import { Avatar } from '@/components/ui'
 import { NAV, visibleFor } from './nav'
 import { RoleSwitcher } from './RoleSwitcher'
+import { CompanySwitcher } from './CompanySwitcher'
 
 function Logo() {
   return (
@@ -39,6 +40,10 @@ export function Sidebar() {
     <aside className="fixed inset-y-0 left-0 z-40 hidden w-[260px] flex-col border-r border-border bg-card/40 backdrop-blur-xl lg:flex">
       <div className="flex h-16 items-center px-4">
         <Logo />
+      </div>
+
+      <div className="px-3 pb-2">
+        <CompanySwitcher />
       </div>
 
       <nav className="no-scrollbar flex-1 space-y-5 overflow-y-auto px-3 py-2">

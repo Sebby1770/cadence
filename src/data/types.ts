@@ -183,3 +183,50 @@ export interface Recognition {
   createdAt: string
   reactions: number
 }
+
+/* ------------------------------------------------------------------ *
+ *  Multi-tenant
+ * ------------------------------------------------------------------ */
+
+export interface Company {
+  id: string
+  name: string
+  slug: string
+  joinCode: string
+  accent: string
+  ownerEmployeeId: string | null
+  createdAt: string
+}
+
+/** Reference data that defines a company's org structure. */
+export interface ReferenceData {
+  employees: Employee[]
+  positions: Position[]
+  departments: Department[]
+  locations: Location[]
+  badges: BadgeDef[]
+}
+
+export type AuditAction =
+  | 'shift.move'
+  | 'shift.assign'
+  | 'shift.pickup'
+  | 'shift.release'
+  | 'shift.publish'
+  | 'swap.offer'
+  | 'swap.resolve'
+  | 'leave.request'
+  | 'leave.resolve'
+  | 'company.create'
+  | 'member.join'
+
+export interface AuditEntry {
+  id: string
+  companyId: string
+  actorId: string | null
+  action: AuditAction | string
+  entity: string
+  entityId: string | null
+  summary: string
+  createdAt: string
+}

@@ -16,6 +16,7 @@ const Clock = lazy(() => import('@/pages/Clock'))
 const Notifications = lazy(() => import('@/pages/Notifications'))
 const Profile = lazy(() => import('@/pages/Profile'))
 const Analytics = lazy(() => import('@/pages/Analytics'))
+const Activity = lazy(() => import('@/pages/Activity'))
 const Admin = lazy(() => import('@/pages/Admin'))
 const Assistant = lazy(() => import('@/pages/Assistant'))
 const NotFound = lazy(() => import('@/pages/NotFound'))
@@ -38,6 +39,7 @@ export default function App() {
         <Route path="/notifications" element={<Notifications />} />
         <Route path="/profile" element={<Profile />} />
         <Route path="/analytics" element={<Analytics />} />
+        <Route path="/activity" element={<Activity />} />
         <Route path="/admin" element={<Admin />} />
         <Route path="/assistant" element={<Assistant />} />
         <Route path="*" element={<NotFound />} />
