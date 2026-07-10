@@ -164,11 +164,16 @@ export const useStore = create<StoreState>()(
           fetchOperational(company.id),
           fetchAudit(company.id),
         ])
-        if (ref && ref.employees.length) setReferenceData(ref)
+        // Only adopt this company's identity if we actually loaded its team —
+        // otherwise keep the current (valid) user so pages never see a missing user.
+        const emps = ref && ref.employees.length ? ref.employees : null
+        if (emps) setReferenceData(ref!)
+        const validUser =
+          emps?.find((e) => e.id === company.ownerEmployeeId)?.id ?? emps?.[0]?.id ?? get().currentUserId
         setActiveCompany(company.id)
         set({
           activeCompanyId: company.id,
-          currentUserId: company.ownerEmployeeId ?? ref?.employees[0]?.id ?? CURRENT_USER_ID,
+          currentUserId: validUser,
           audit,
           ...(ops ?? {}),
         })

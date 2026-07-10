@@ -1,6 +1,6 @@
 import { Suspense, useEffect, useState } from 'react'
 import { Outlet, useLocation } from 'react-router-dom'
-import { AnimatePresence, motion } from 'framer-motion'
+import { motion } from 'framer-motion'
 import { Sidebar } from './Sidebar'
 import { Topbar } from './Topbar'
 import { BottomNav } from './BottomNav'
@@ -60,19 +60,19 @@ export function AppShell() {
       <div className="lg:pl-[260px]">
         <Topbar onOpenCommand={() => setCmdOpen(true)} />
         <main className="px-4 pb-28 pt-6 lg:px-8 lg:pb-12">
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={activeCompanyId + ':' + location.pathname}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -6 }}
-              transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
-            >
-              <Suspense fallback={<PageFallback />}>
-                <Outlet />
-              </Suspense>
-            </motion.div>
-          </AnimatePresence>
+          {/* Keyed enter-only transition. No AnimatePresence exit: a `mode="wait"`
+              exit can wedge at opacity 0 when navigations fire faster than the
+              exit animation, leaving the page invisible. Enter-only can't wedge. */}
+          <motion.div
+            key={activeCompanyId + ':' + location.pathname}
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+          >
+            <Suspense fallback={<PageFallback />}>
+              <Outlet />
+            </Suspense>
+          </motion.div>
         </main>
       </div>
       <BottomNav />
