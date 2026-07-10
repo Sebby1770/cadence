@@ -90,7 +90,7 @@ export default function Team() {
                     <DeptDot dept={departmentKey(e.departmentId)} /> {departmentName(e.departmentId)}
                   </span>
                   <span className="inline-flex items-center gap-1 font-medium text-amber-500">
-                    <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" /> {e.rating}
+                    <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" /> {e.rating.toFixed(1)}
                   </span>
                 </div>
                 <div className="mt-3 flex flex-wrap gap-1">

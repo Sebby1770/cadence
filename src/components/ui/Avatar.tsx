@@ -1,5 +1,4 @@
-import { useState } from 'react'
-import { cn, initials } from '@/lib/utils'
+import { cn, initials, seededRandom } from '@/lib/utils'
 import type { WorkStatus } from '@/data/types'
 
 const SIZES = {
@@ -19,7 +18,26 @@ const STATUS_COLOR: Record<WorkStatus, string> = {
   off: 'bg-muted-foreground/40',
 }
 
+/*
+ * Deterministic gradient per person (Linear/Notion-style initials avatars).
+ * No network fetches, no mismatched stock photos, always crisp — the same
+ * name maps to the same gradient everywhere in the app.
+ */
+const PALETTES = [
+  'from-indigo-500 to-violet-500',
+  'from-sky-500 to-cyan-400',
+  'from-emerald-500 to-teal-400',
+  'from-amber-400 to-orange-500',
+  'from-rose-400 to-pink-500',
+  'from-violet-500 to-fuchsia-500',
+  'from-blue-500 to-indigo-400',
+  'from-teal-500 to-emerald-500',
+] as const
+
+const paletteFor = (name: string) => PALETTES[Math.floor(seededRandom(name) * PALETTES.length)]
+
 interface AvatarProps {
+  /** Accepted for API compatibility; photos are intentionally not rendered. */
   src?: string
   name: string
   size?: keyof typeof SIZES
@@ -28,29 +46,19 @@ interface AvatarProps {
   className?: string
 }
 
-export function Avatar({ src, name, size = 'md', status, ring, className }: AvatarProps) {
-  const [error, setError] = useState(false)
+export function Avatar({ name, size = 'md', status, ring, className }: AvatarProps) {
   const dot = size === 'xs' || size === 'sm' ? 'h-2.5 w-2.5' : 'h-3 w-3'
   return (
     <span className={cn('relative inline-flex shrink-0', className)}>
       <span
         className={cn(
-          'inline-flex items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-primary/80 to-purple-500 font-semibold text-white',
+          'inline-flex select-none items-center justify-center overflow-hidden rounded-full bg-gradient-to-br font-semibold text-white',
+          paletteFor(name),
           SIZES[size],
           ring && 'ring-2 ring-background',
         )}
       >
-        {src && !error ? (
-          <img
-            src={src}
-            alt={name}
-            loading="lazy"
-            onError={() => setError(true)}
-            className="h-full w-full object-cover drag-none"
-          />
-        ) : (
-          <span>{initials(name)}</span>
-        )}
+        <span className="drag-none">{initials(name)}</span>
       </span>
       {status && (
         <span
@@ -68,7 +76,7 @@ export function Avatar({ src, name, size = 'md', status, ring, className }: Avat
 
 export function AvatarStack({
   names,
-  srcs,
+  srcs: _srcs,
   max = 4,
   size = 'sm',
 }: {
@@ -82,7 +90,7 @@ export function AvatarStack({
   return (
     <div className="flex items-center -space-x-2">
       {shown.map((n, i) => (
-        <Avatar key={i} name={n} src={srcs?.[i]} size={size} ring />
+        <Avatar key={i} name={n} size={size} ring />
       ))}
       {extra > 0 && (
         <span

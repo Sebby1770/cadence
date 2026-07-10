@@ -9,7 +9,7 @@ import {
   shiftPay,
 } from '@/data/selectors'
 import type { DeptKey, Shift } from '@/data/types'
-import { Avatar, DeptDot } from '@/components/ui'
+import { DeptDot } from '@/components/ui'
 
 const DEPT_BG: Record<DeptKey, string> = {
   floor: 'bg-dept-floor/10 border-dept-floor/30 text-dept-floor',
@@ -43,10 +43,7 @@ export function ShiftChip({ shift, onClick, compact }: { shift: Shift; onClick?:
           {open ? (
             <span className="font-medium">Open · {positionName(shift.positionId)}</span>
           ) : (
-            <>
-              {emp && <Avatar src={emp.avatar} name={emp.name} size="xs" className="h-4 w-4" />}
-              <span className="truncate">{emp?.firstName ?? positionName(shift.positionId)}</span>
-            </>
+            <span className="truncate">{emp?.firstName ?? positionName(shift.positionId)}</span>
           )}
         </div>
       )}

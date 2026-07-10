@@ -47,7 +47,7 @@ export default function Profile() {
             <p className="text-sm text-muted-foreground">{positionName(me.positionId)} · {locationName(me.homeLocationId)}</p>
           </div>
           <div className="flex items-center gap-2">
-            <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/12 px-2.5 py-1 text-[13px] font-semibold text-amber-500"><Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" /> {me.rating}</span>
+            <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/12 px-2.5 py-1 text-[13px] font-semibold text-amber-500"><Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" /> {me.rating.toFixed(1)}</span>
             <span className="inline-flex items-center gap-1 rounded-full bg-dept-kitchen/12 px-2.5 py-1 text-[13px] font-semibold text-dept-kitchen"><Flame className="h-3.5 w-3.5" /> {me.streak}-shift streak</span>
           </div>
         </div>

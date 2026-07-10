@@ -14,4 +14,20 @@ export default defineConfig({
     host: true,
     port: 5173,
   },
+  build: {
+    rollupOptions: {
+      output: {
+        // Split stable vendors out of the app chunk for better caching
+        // and a smaller initial parse.
+        manualChunks: {
+          'react-core': ['react', 'react-dom', 'react-router-dom'],
+          motion: ['framer-motion'],
+          backend: ['@supabase/supabase-js'],
+          charts: ['recharts'],
+          dates: ['date-fns'],
+          'drag-and-drop': ['@dnd-kit/core'],
+        },
+      },
+    },
+  },
 })

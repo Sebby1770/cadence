@@ -7,6 +7,26 @@ and the project aims to follow [Semantic Versioning](https://semver.org/spec/v2.
 Cadence also keeps a live, in-app **Activity log** (per workspace) at `/activity`
 that records every schedule change, swap, leave decision, and workspace event.
 
+## [1.1.0] — 2026-07-11
+
+### Changed — Visual clean pass ✨
+- **Avatars** are now deterministic gradient-initials (Linear/Notion style)
+  instead of random stock photos: no more name/photo mismatches, no broken
+  tiny avatars, and ~100 fewer network requests on the Schedule view. The same
+  person always gets the same gradient everywhere in the app.
+- **Page titles** use a solid foreground weight; the two-tone gradient is
+  reserved for the dashboard greeting so it stays special.
+- **Calendar chips** show time + name only — the schedule grid reads much
+  cleaner at a glance.
+- **Backdrop restraint**: the aurora/grain ambience is dialled down for a
+  calmer, more premium surface.
+- **Snappier navigation**: page/header entrances shortened (~0.35s → ~0.2s).
+- **Ratings** always render with one decimal (5 → 5.0).
+
+### Performance
+- Vendor code (React, Framer Motion, Supabase) is split into separate
+  long-cacheable chunks, shrinking the main app bundle substantially.
+
 ## [1.0.0] — 2026-07-07
 
 ### Added — Multi-tenant workspaces 🏢

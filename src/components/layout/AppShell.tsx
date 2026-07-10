@@ -51,10 +51,10 @@ export function AppShell() {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Ambient animated backdrop */}
+      {/* Ambient animated backdrop — kept deliberately subtle */}
       <div className="pointer-events-none fixed inset-0 -z-10">
-        <Aurora intensity={0.85} />
-        <Grain opacity={0.03} />
+        <Aurora intensity={0.5} />
+        <Grain opacity={0.015} />
       </div>
       <Sidebar />
       <div className="lg:pl-[260px]">
@@ -65,9 +65,9 @@ export function AppShell() {
               exit animation, leaving the page invisible. Enter-only can't wedge. */}
           <motion.div
             key={activeCompanyId + ':' + location.pathname}
-            initial={{ opacity: 0, y: 10 }}
+            initial={{ opacity: 0, y: 6 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+            transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
           >
             <Suspense fallback={<PageFallback />}>
               <Outlet />
