@@ -13,7 +13,7 @@ import {
   type DragEndEvent,
   type DragStartEvent,
 } from '@dnd-kit/core'
-import { ChevronLeft, ChevronRight, Send, Copy, Filter, MapPin, Clock, Users, Wand2 } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Send, Copy, Filter, MapPin, Clock, Users, Wand2, Rows3 } from 'lucide-react'
 import { useStore } from '@/store/useStore'
 import { useNow } from '@/hooks/useNow'
 import { DEPARTMENTS, LOCATIONS } from '@/data/mock'
@@ -52,6 +52,7 @@ export default function Schedule() {
   const [dept, setDept] = useState<'all' | DeptKey>('all')
   const [loc, setLoc] = useState<'all' | string>('all')
   const [myOnly, setMyOnly] = useState(false)
+  const [dense, setDense] = useState(false)
   const [builder, setBuilder] = useState(false)
   const [selected, setSelected] = useState<Shift | null>(null)
   const [activeId, setActiveId] = useState<string | null>(null)
@@ -91,7 +92,7 @@ export default function Schedule() {
     }
   }
 
-  const weekGrid = <WeekGrid week={week} now={now} shifts={shifts} match={match} onSelect={setSelected} builder={builder} />
+  const weekGrid = <WeekGrid week={week} now={now} shifts={shifts} match={match} onSelect={setSelected} builder={builder} dense={dense} />
 
   return (
     <PageShell>
@@ -168,6 +169,19 @@ export default function Schedule() {
         >
           <Users className="h-3.5 w-3.5" /> My shifts
         </button>
+        {view === 'week' && (
+          <button
+            onClick={() => setDense((v) => !v)}
+            title={dense ? 'Comfortable rows' : 'Compact rows'}
+            aria-pressed={dense}
+            className={cn(
+              'inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[13px] font-medium transition-colors',
+              dense ? 'bg-primary text-primary-foreground' : 'bg-secondary text-muted-foreground hover:text-foreground',
+            )}
+          >
+            <Rows3 className="h-3.5 w-3.5" /> Compact
+          </button>
+        )}
       </Card>
 
       {builder && view === 'week' && (
@@ -235,11 +249,11 @@ function FilterPills<T extends string>({
   )
 }
 
-function DraggableShift({ shift, onSelect }: { shift: Shift; onSelect: () => void }) {
+function DraggableShift({ shift, onSelect, dense }: { shift: Shift; onSelect: () => void; dense?: boolean }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: shift.id })
   return (
     <div ref={setNodeRef} {...listeners} {...attributes} className={cn('touch-none', isDragging && 'opacity-40')}>
-      <ShiftChip shift={shift} onClick={onSelect} />
+      <ShiftChip shift={shift} onClick={onSelect} compact={dense} />
     </div>
   )
 }
@@ -260,6 +274,7 @@ function WeekGrid({
   match,
   onSelect,
   builder,
+  dense,
 }: {
   week: string[]
   now: Date
@@ -267,6 +282,7 @@ function WeekGrid({
   match: (s: Shift) => boolean
   onSelect: (s: Shift) => void
   builder?: boolean
+  dense?: boolean
 }) {
   return (
     <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-7">
@@ -277,16 +293,16 @@ function WeekGrid({
         const chips = day.length ? (
           day.map((s) =>
             builder ? (
-              <DraggableShift key={s.id} shift={s} onSelect={() => onSelect(s)} />
+              <DraggableShift key={s.id} shift={s} onSelect={() => onSelect(s)} dense={dense} />
             ) : (
-              <ShiftChip key={s.id} shift={s} onClick={() => onSelect(s)} />
+              <ShiftChip key={s.id} shift={s} onClick={() => onSelect(s)} compact={dense} />
             ),
           )
         ) : (
           <p className="rounded-lg border border-dashed border-border py-4 text-center text-[11px] text-muted-foreground">No shifts</p>
         )
         return (
-          <div key={d} className={builder ? '' : 'min-h-[160px]'}>
+          <div key={d} className={builder ? '' : dense ? 'min-h-[120px]' : 'min-h-[160px]'}>
             <div className={cn('mb-2 flex items-center justify-between rounded-lg px-2 py-1.5', today && 'bg-primary/10')}>
               <span className="text-[11px] font-semibold uppercase text-muted-foreground">
                 {date.toLocaleDateString('en-US', { weekday: 'short' })}
@@ -295,7 +311,11 @@ function WeekGrid({
                 {date.getDate()}
               </span>
             </div>
-            {builder ? <DroppableDay dateStr={d}>{chips}</DroppableDay> : <div className="space-y-1.5">{chips}</div>}
+            {builder ? (
+              <DroppableDay dateStr={d}>{chips}</DroppableDay>
+            ) : (
+              <div className={dense ? 'space-y-1' : 'space-y-1.5'}>{chips}</div>
+            )}
           </div>
         )
       })}

@@ -15,7 +15,6 @@ import {
   upcomingShifts,
 } from '@/data/selectors'
 import { cn, formatHours } from '@/lib/utils'
-import { weekDates } from '@/lib/dates'
 import { Avatar, Badge, Button, Card, DeptDot, EmptyState, Modal, Ring } from '@/components/ui'
 import { ShiftListItem } from '@/components/shared/ShiftBits'
 import { PageHeader, PageShell } from '@/components/layout/PageHeader'
@@ -75,7 +74,7 @@ export default function Team() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: Math.min(i * 0.02, 0.4) }}
               onClick={() => setFocus(e)}
-              className="text-left"
+              className="h-full text-left"
             >
               <Card hover className="h-full p-4">
                 <div className="flex items-center gap-3">
@@ -93,9 +92,10 @@ export default function Team() {
                     <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" /> {e.rating.toFixed(1)}
                   </span>
                 </div>
-                <div className="mt-3 flex flex-wrap gap-1">
+                {/* Single clipped row so every card in a grid row is the same height */}
+                <div className="mt-3 flex h-[22px] flex-nowrap items-center gap-1 overflow-hidden">
                   {e.skills.slice(0, 3).map((s) => (
-                    <span key={s} className="rounded-md bg-secondary px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">{s}</span>
+                    <span key={s} className="whitespace-nowrap rounded-md bg-secondary px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">{s}</span>
                   ))}
                 </div>
               </Card>
