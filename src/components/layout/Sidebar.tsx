@@ -77,11 +77,14 @@ export function Sidebar() {
                           {isActive && (
                             <motion.span
                               layoutId="nav-active"
-                              className="absolute inset-0 rounded-xl bg-secondary"
+                              className="absolute inset-0 rounded-xl border border-primary/15 bg-gradient-to-r from-primary/[0.14] to-primary/[0.05] shadow-[inset_0_1px_0_hsl(var(--primary)/0.15)]"
                               transition={{ type: 'spring', stiffness: 400, damping: 34 }}
                             />
                           )}
-                          <item.icon className="relative z-10 h-[18px] w-[18px]" strokeWidth={2.1} />
+                          <item.icon
+                            className={cn('relative z-10 h-[18px] w-[18px]', isActive && 'text-primary')}
+                            strokeWidth={2.1}
+                          />
                           <span className="relative z-10 flex-1">{item.label}</span>
                           {count > 0 && (
                             <span className="relative z-10 inline-flex h-5 min-w-[20px] items-center justify-center rounded-full bg-primary px-1.5 text-[11px] font-semibold text-primary-foreground">
