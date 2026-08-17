@@ -7,6 +7,29 @@ and the project aims to follow [Semantic Versioning](https://semver.org/spec/v2.
 Cadence also keeps a live, in-app **Activity log** (per workspace) at `/activity`
 that records every schedule change, swap, leave decision, and workspace event.
 
+## [1.2.0] — 2026-08-18
+
+### Added — Staffing insights, real ICS, tests
+- **Staffing engine** (`src/lib/staffing.ts`): pure helpers for double-books,
+  weekly overtime vs `availability.max`, coverage gaps vs `headcountTarget`,
+  hours fairness (mean / stdev), and a real `VCALENDAR` builder.
+- **Analytics** (manager/admin) shows double-book count, overtime count,
+  coverage-gap locations, hours stdev, and short “worst 5” tables — existing
+  charts stay put.
+- **Dashboard** surfaces a calm warning chip when *you* are double-booked or
+  over your weekly max this week.
+- **Profile → Export .ics** now downloads a real `.ics` of upcoming
+  published/confirmed shifts (Google / Apple / Outlook connect remains a demo
+  toast).
+- **Vitest** (`npm test`) covers overlap, adjacent non-overlap, overtime,
+  coverage gaps, and ICS output.
+- **CI** (`.github/workflows/ci.yml`): Node 20, `npm ci`, `npm test`,
+  `npx tsc -b --noEmit`.
+
+### Removed
+- Unused stub pages (`src/pages/* 2.tsx`) that only rendered “Loading…” and
+  were never routed from `App.tsx`.
+
 ## [1.1.0] — 2026-07-11
 
 ### Changed — Visual clean pass ✨
@@ -90,6 +113,8 @@ that records every schedule change, swap, leave decision, and workspace event.
   design-token system with light/dark themes, command palette, role switcher,
   mobile bottom-nav, and a rich deterministic demo dataset.
 
+[1.2.0]: https://github.com/Sebby1770/cadence/releases/tag/v1.2.0
+[1.1.0]: https://github.com/Sebby1770/cadence/releases/tag/v1.1.0
 [1.0.0]: https://github.com/Sebby1770/cadence/releases/tag/v1.0.0
 [0.4.0]: https://github.com/Sebby1770/cadence/releases/tag/v0.4.0
 [0.3.0]: https://github.com/Sebby1770/cadence/releases/tag/v0.3.0

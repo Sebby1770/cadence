@@ -13,20 +13,25 @@ import {
   CartesianGrid,
   Tooltip,
 } from 'recharts'
-import { Clock, DollarSign, Store, Gauge, AlertTriangle } from 'lucide-react'
+import { Clock, DollarSign, Store, Gauge, AlertTriangle, Copy, MapPin, Scale } from 'lucide-react'
 import { useStore } from '@/store/useStore'
 import { useNow } from '@/hooks/useNow'
-import { DEPARTMENTS, LOCATIONS } from '@/data/mock'
+import { DEPARTMENTS, EMPLOYEES, LOCATIONS } from '@/data/mock'
 import {
   coverage,
-  departmentName,
+  getEmployee,
   laborCost,
   shiftHours,
-  shiftPay,
   shiftsOn,
 } from '@/data/selectors'
-import { currency } from '@/lib/utils'
-import { addDays, iso, weekDates } from '@/lib/dates'
+import { currency, formatHours, minutesToLabel } from '@/lib/utils'
+import { addDays, iso, shortDate, weekDates } from '@/lib/dates'
+import {
+  coverageGaps,
+  findDoubleBooks,
+  hoursFairness,
+  overtimeFlags,
+} from '@/lib/staffing'
 import { Card, Segmented } from '@/components/ui'
 import { CountUp } from '@/components/fx'
 import { PageHeader, PageShell } from '@/components/layout/PageHeader'
@@ -101,6 +106,17 @@ export default function Analytics() {
     days: leaves.filter((l) => l.type === t).reduce((a, l) => a + l.days, 0),
   }))
 
+  const staffing = useMemo(() => {
+    const weekShiftsAll = shifts.filter((s) => week.includes(s.date))
+    const doubles = findDoubleBooks(weekShiftsAll).sort((a, b) => b.overlapMin - a.overlapMin)
+    const ot = overtimeFlags(weekShiftsAll, EMPLOYEES, week)
+    const gaps = week.flatMap((d) => coverageGaps(weekShiftsAll, LOCATIONS, d))
+    gaps.sort((a, b) => b.shortfall - a.shortfall || a.assigned / a.target - b.assigned / b.target)
+    const fairness = hoursFairness(weekShiftsAll, EMPLOYEES, week)
+    const gapLocations = new Set(gaps.map((g) => g.location.id)).size
+    return { doubles, ot, gaps, fairness, gapLocations }
+  }, [shifts, week])
+
   return (
     <PageShell>
       <PageHeader
@@ -115,6 +131,69 @@ export default function Analytics() {
         <Kpi icon={Store} label="Open shifts" value={openCount} tint="text-dept-bar" />
         <Kpi icon={Gauge} label="Avg coverage" value={Math.round(avgCoverage * 100)} format={(n) => `${Math.round(n)}%`} tint="text-dept-floor" />
         <Kpi icon={AlertTriangle} label="Overtime risk" value={overtime} tint="text-warning" />
+      </div>
+
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <Kpi icon={Copy} label="Double-books" value={staffing.doubles.length} tint="text-danger" />
+        <Kpi icon={AlertTriangle} label="Over weekly max" value={staffing.ot.length} tint="text-warning" />
+        <Kpi icon={MapPin} label="Coverage-gap locations" value={staffing.gapLocations} tint="text-dept-floor" />
+        <Kpi
+          icon={Scale}
+          label="Hours stdev"
+          value={staffing.fairness.stdev}
+          format={(n) => `${n.toFixed(1)}h`}
+          tint="text-primary"
+        />
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-2">
+        <InsightTable
+          title="Worst double-books"
+          subtitle="Overlapping assigned pairs this week"
+          empty="No overlapping assignments this week."
+          rows={staffing.doubles.slice(0, 5).map((pair) => {
+            const person = getEmployee(pair.a.employeeId)
+            return {
+              key: `${pair.a.id}-${pair.b.id}`,
+              primary: person?.name ?? 'Teammate',
+              secondary: `${shortDate(pair.a.date)} · ${minutesToLabel(pair.a.start)}–${minutesToLabel(pair.a.end)} / ${minutesToLabel(pair.b.start)}–${minutesToLabel(pair.b.end)}`,
+              value: `${pair.overlapMin}m`,
+            }
+          })}
+        />
+        <InsightTable
+          title="Worst overtime"
+          subtitle="Furthest over availability.max"
+          empty="Nobody is over their weekly max."
+          rows={staffing.ot.slice(0, 5).map((row) => ({
+            key: row.employee.id,
+            primary: row.employee.name,
+            secondary: `${formatHours(row.hours, true)} scheduled · max ${row.max}h`,
+            value: `+${formatHours(row.overBy, true)}`,
+          }))}
+        />
+        <InsightTable
+          title="Worst coverage gaps"
+          subtitle="Assigned headcount vs target"
+          empty="Every location meets its target this week."
+          rows={staffing.gaps.slice(0, 5).map((gap) => ({
+            key: `${gap.location.id}-${gap.date}`,
+            primary: gap.location.name,
+            secondary: `${shortDate(gap.date)} · ${gap.assigned} assigned / ${gap.target} target`,
+            value: `−${gap.shortfall}`,
+          }))}
+        />
+        <InsightTable
+          title="Hours furthest from mean"
+          subtitle={`Mean ${formatHours(staffing.fairness.mean, true)} among ${staffing.fairness.count} working`}
+          empty="Not enough scheduled hours to compare."
+          rows={staffing.fairness.byEmployee.slice(0, 5).map((row) => ({
+            key: row.employee.id,
+            primary: row.employee.name,
+            secondary: formatHours(row.hours, true),
+            value: `${row.delta >= 0 ? '+' : '−'}${formatHours(Math.abs(row.delta), true)}`,
+          }))}
+        />
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
@@ -242,5 +321,41 @@ function Legend2({ color, label, value }: { color: string; label: string; value:
       <span className="text-sm text-muted-foreground">{label}</span>
       <span className="text-sm font-bold tabular">{value}</span>
     </div>
+  )
+}
+
+function InsightTable({
+  title,
+  subtitle,
+  empty,
+  rows,
+}: {
+  title: string
+  subtitle: string
+  empty: string
+  rows: { key: string; primary: string; secondary: string; value: string }[]
+}) {
+  return (
+    <Card className="p-5">
+      <div className="mb-3">
+        <h3 className="text-[15px] font-semibold">{title}</h3>
+        <p className="text-xs text-muted-foreground">{subtitle}</p>
+      </div>
+      {rows.length === 0 ? (
+        <p className="py-4 text-center text-sm text-muted-foreground">{empty}</p>
+      ) : (
+        <ul className="space-y-2">
+          {rows.map((row) => (
+            <li key={row.key} className="flex items-center justify-between gap-3 rounded-xl bg-secondary/40 px-3 py-2">
+              <div className="min-w-0">
+                <p className="truncate text-sm font-medium">{row.primary}</p>
+                <p className="truncate text-[11px] text-muted-foreground">{row.secondary}</p>
+              </div>
+              <span className="shrink-0 text-sm font-semibold tabular">{row.value}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </Card>
   )
 }

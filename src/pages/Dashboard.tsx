@@ -18,6 +18,7 @@ import {
   ChevronRight,
   Flame,
   DollarSign,
+  AlertTriangle,
 } from 'lucide-react'
 import { useStore } from '@/store/useStore'
 import { useNow } from '@/hooks/useNow'
@@ -38,6 +39,7 @@ import {
   workingNow,
 } from '@/data/selectors'
 import { iso } from '@/lib/dates'
+import { findDoubleBooks, overtimeFlags } from '@/lib/staffing'
 import { Avatar, Button, Card, Progress, Ring } from '@/components/ui'
 import { CountUp, GradientText, Magnetic, SpotlightCard } from '@/components/fx'
 import { ShiftListItem } from '@/components/shared/ShiftBits'
@@ -69,6 +71,17 @@ export default function Dashboard() {
   const open = openShifts(shifts).filter((s) => s.date >= iso(now))
   const working = workingNow(shifts, now)
   const pendingCount = pendingSwaps.length + pendingLeaves.length
+
+  const staffWarning = useMemo(() => {
+    const doubled = findDoubleBooks(shifts).some(
+      (pair) => pair.a.employeeId === me.id && week.includes(pair.a.date),
+    )
+    const overtime = overtimeFlags(shifts, [me], week).length > 0
+    if (doubled && overtime) return 'Overlapping shifts and over your weekly max'
+    if (doubled) return 'You have overlapping shifts this week'
+    if (overtime) return 'This week’s hours are over your availability max'
+    return null
+  }, [shifts, me, week])
 
   const todayEarnings = upcoming
     .filter((s) => s.date === iso(now))
@@ -114,9 +127,18 @@ export default function Dashboard() {
                     )} at ${locationName(next.locationId)}.`
                 : 'You have no upcoming shifts scheduled. Enjoy the break!'}
             </p>
-            {me.streak > 4 && (
-              <div className="mt-4 inline-flex items-center gap-1.5 rounded-full bg-dept-kitchen/12 px-3 py-1 text-[13px] font-semibold text-dept-kitchen">
-                <Flame className="h-4 w-4" /> {me.streak}-shift punctuality streak
+            {(me.streak > 4 || staffWarning) && (
+              <div className="mt-4 flex flex-wrap items-center gap-2">
+                {me.streak > 4 && (
+                  <div className="inline-flex items-center gap-1.5 rounded-full bg-dept-kitchen/12 px-3 py-1 text-[13px] font-semibold text-dept-kitchen">
+                    <Flame className="h-4 w-4" /> {me.streak}-shift punctuality streak
+                  </div>
+                )}
+                {staffWarning && (
+                  <div className="inline-flex items-center gap-1.5 rounded-full bg-warning/12 px-3 py-1 text-[13px] font-semibold text-warning">
+                    <AlertTriangle className="h-4 w-4" /> {staffWarning}
+                  </div>
+                )}
               </div>
             )}
           </div>

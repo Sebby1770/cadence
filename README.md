@@ -31,8 +31,12 @@ browser on a rich, internally-consistent demo dataset — no backend required.
 - **Leave** — request annual/sick/personal/study leave with balances and manager approvals.
 - **Time Clock** — live timer, breaks, GPS/QR/photo verification, and clock history.
 - **Notifications** — grouped, filterable, with push/email/SMS preferences.
-- **Profile** — hours, achievements/badges, streaks, recognition, calendar sync.
-- **Analytics** — coverage, hours, labour cost, acceptance rate, peak staffing (Recharts).
+- **Profile** — hours, achievements/badges, streaks, recognition, and a **real
+  `.ics` download** of upcoming published/confirmed shifts (Google / Apple /
+  Outlook connect is still a demo toast).
+- **Analytics** — coverage, hours, labour cost, acceptance rate, peak staffing
+  (Recharts), plus **staffing insights**: double-books, overtime vs weekly max,
+  coverage gaps, and hours fairness (stdev) with worst-5 tables.
 - **Admin** — users, workplaces, departments, positions, pay rates, settings, audit log.
 - **Ask Cadence AI** — a working assistant: "Who can cover Friday night?", "When am I working next?"
 
@@ -57,9 +61,13 @@ role switcher (Employee / Manager / Admin), and smooth spring animations through
 ```bash
 npm install
 npm run dev      # http://localhost:5183
+npm test         # vitest (staffing engine)
 npm run build    # type-check + production build
 npm run preview  # preview the build
 ```
+
+GitHub Actions (`.github/workflows/ci.yml`) runs `npm ci`, `npm test`, and
+`npx tsc -b --noEmit` on Node 20.
 
 By default Cadence runs on rich in-memory demo data — no backend required.
 
@@ -107,10 +115,13 @@ src/
     ui/         Design-system primitives (Avatar, Button, Card, Modal, …)
   data/         Types, mock dataset, and selector helpers
   hooks/        useNow, useMediaQuery
-  lib/          utils, dates, theme
+  lib/          utils, dates, theme, staffing engine (overlap, OT, ICS)
   pages/        One file per route (Dashboard, Schedule, Marketplace, …)
   store/        Zustand store (pick-ups, swaps, leave, chat, clock, toasts)
 ```
+
+Dead stub pages (`src/pages/* 2.tsx`) were removed in 1.2.0 — they were never
+imported from `App.tsx`.
 
 ## 🎨 Design system
 
