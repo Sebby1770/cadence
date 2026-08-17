@@ -14,6 +14,7 @@ import {
 } from '@/data/selectors'
 import { cn, formatHours } from '@/lib/utils'
 import { weekDates } from '@/lib/dates'
+import { buildIcs } from '@/lib/staffing'
 import { Avatar, Badge, Button, Card, Ring } from '@/components/ui'
 import { PageHeader, PageShell } from '@/components/layout/PageHeader'
 
@@ -30,6 +31,20 @@ export default function Profile() {
   const received = recognition.filter((r) => r.toId === me.id)
 
   const leaderboard = [...EMPLOYEES].sort((a, b) => b.streak - a.streak).slice(0, 5)
+
+  const exportIcs = () => {
+    const ics = buildIcs(shifts, me, now)
+    const blob = new Blob([ics], { type: 'text/calendar;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = 'cadence.ics'
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    URL.revokeObjectURL(url)
+    addToast({ title: 'Exported cadence.ics', description: 'Your shifts are ready to import.', kind: 'info' })
+  }
 
   return (
     <PageShell>
@@ -154,7 +169,7 @@ export default function Profile() {
           {['Google Calendar', 'Apple Calendar', 'Outlook'].map((c) => (
             <Button key={c} variant="outline" onClick={() => addToast({ title: `Connected to ${c}`, kind: 'success' })}>{c}</Button>
           ))}
-          <Button variant="secondary" onClick={() => addToast({ title: 'Exported cadence.ics', description: 'Your shifts are ready to import.', kind: 'info' })}><Download className="h-4 w-4" /> Export .ics</Button>
+          <Button variant="secondary" onClick={exportIcs}><Download className="h-4 w-4" /> Export .ics</Button>
         </div>
       </Card>
     </PageShell>
